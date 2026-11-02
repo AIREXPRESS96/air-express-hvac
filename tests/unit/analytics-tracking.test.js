@@ -70,8 +70,13 @@ test("lead form pages load both analytics and intake scripts", () => {
   }
 });
 
-test("public marketing pages have a single approved local measurement source", () => {
+test("public marketing pages have only the approved measurement sources", () => {
   const publicHtmlFiles = listPublicHtmlFiles();
+
+  // GTM-WHS7CJZD was intentionally added sitewide alongside the existing
+  // analytics.js GA4 tag (G-JZ7PY32EVX) — both are approved to run together.
+  // Any other GTM container found is treated as unverified/unapproved.
+  const approvedGtmContainers = new Set(["GTM-WHS7CJZD"]);
 
   assert.ok(publicHtmlFiles.length >= 100, "expected broad public HTML coverage");
 
@@ -81,15 +86,21 @@ test("public marketing pages have a single approved local measurement source", (
     const hasApprovedInlineGa4 =
       html.includes("G-JZ7PY32EVX") && /googletagmanager\.com\/gtag\/js/i.test(html);
     const gtmContainers = [...new Set([...html.matchAll(/\bGTM-[A-Z0-9]+\b/g)].map((match) => match[0]))];
+    const unapprovedGtmContainers = gtmContainers.filter((id) => !approvedGtmContainers.has(id));
 
     assert.ok(
       hasAnalyticsJs || hasApprovedInlineGa4,
       `${page} should load /analytics.js or the approved inline GA4 source`
     );
     assert.equal(
+      unapprovedGtmContainers.length,
+      0,
+      `${page} includes unverified GTM containers: ${unapprovedGtmContainers.join(", ")}`
+    );
+    assert.equal(
       Number(hasAnalyticsJs) + Number(hasApprovedInlineGa4) + gtmContainers.length,
-      1,
-      `${page} should not duplicate analytics sources or include unverified GTM containers`
+      2,
+      `${page} should have exactly the approved analytics.js/GA4 source plus the approved GTM-WHS7CJZD container`
     );
   }
 });
